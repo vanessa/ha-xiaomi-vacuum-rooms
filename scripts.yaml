@@ -1,0 +1,353 @@
+################################################################################
+# Xiaomi Robot Vacuum H50 Pro  (xiaomi.vacuum.ov42gl) via the xiaomi_home
+# integration. Room-addressable cleaning through MIoT action entities.
+#
+# ---------------------------------------------------------------------------
+# BEFORE USING -- two substitutions, both unavoidable. See README.md.
+#
+#   1. ENTITY PREFIX. Every entity below reads xiaomi_xx_000000000_ov42gl,
+#      which is a PLACEHOLDER. Yours encodes your account region + device id.
+#      Find it in Developer Tools > States, then:
+#        sed -i 's/xiaomi_xx_000000000_ov42gl/<your_prefix>/g' scripts.yaml
+#
+#   2. ROOM IDs. The ids used below are one example map, NOT universal:
+#        3 = Living Room | 4 = Kitchen | 5 = Bedroom
+#        6 = Office      | 7 = Bathroom
+#      Read yours from sensor.<your_prefix>_room_information_p_2_16.
+# ---------------------------------------------------------------------------
+#
+# Entity IDs, fields and comments are English on purpose. Only the "alias:"
+# values are Portuguese, because that is what Alexa listens for.
+#
+# The two "vacuum_helper_*" scripts are internal -> do NOT expose to Alexa.
+# (HA silently drops entity IDs that start with "_", hence the naming.)
+#
+# HA Cloud exposes a script to Alexa as a SCENE, so the phrase is:
+#     "Alexa, ligar Aspirar Cozinha"
+#
+# DEFAULT: "Aspirar ..." = vacuum only.  "Passar Pano ..." = mop only.
+################################################################################
+
+vacuum_helper_clean_rooms:
+  alias: "[helper] Vacuum - clean rooms"
+  icon: mdi:robot-vacuum
+  mode: single
+  fields:
+    rooms:
+      name: Room IDs
+      description: "List of room IDs, e.g. [3, 4]"
+      required: true
+      example: "[3, 4]"
+      selector:
+        object:
+    clean_type:
+      name: Clean type
+      default: "Vacuuming"
+      selector:
+        select:
+          options:
+            - "Vacuuming"
+            - "Mopping"
+            - "Vacuuming & Mopping"
+            - "Vacuuming before mopping"
+    suction:
+      name: Suction
+      default: "Standard"
+      selector:
+        select:
+          options: ["Silent", "Standard", "Strong", "Turbo"]
+    water:
+      name: Water output (mopping only)
+      selector:
+        select:
+          options: ["Off", "Level 1", "Level 2", "Level 3"]
+  sequence:
+    # ==========================================================================
+    # RESET -- CRITICAL. If the robot has a paused or in-progress job, it
+    # DISCARDS the room selection and starts a whole-house clean instead.
+    # Observed 2026-08-08 18:20 UTC: config showed rooms 7 / clean_mode 3, then
+    # 2 seconds later flipped to clean_mode 1 (whole house) because an earlier
+    # bedroom job was still paused. So: end any job before sending a room clean.
+    # ==========================================================================
+    - alias: End any pending or paused job
+      if:
+        - condition: not
+          conditions:
+            - condition: state
+              entity_id: vacuum.xiaomi_xx_000000000_ov42gl
+              state: "docked"
+      then:
+        - action: button.press
+          target:
+            entity_id: button.xiaomi_xx_000000000_ov42gl_stop_working_a_2_51
+        - delay:
+            seconds: 4
+    - alias: Set vacuum / mop mode
+      action: select.select_option
+      target:
+        entity_id: select.xiaomi_xx_000000000_ov42gl_sweep_mop_type_p_2_4
+      data:
+        option: "{{ clean_type | default('Vacuuming') }}"
+    - alias: Set suction power
+      action: select.select_option
+      target:
+        entity_id: select.xiaomi_xx_000000000_ov42gl_mode_p_2_9
+      data:
+        option: "{{ suction | default('Standard') }}"
+    # Only touch water when the job actually mops, so a vacuum-only pass does
+    # not make the robot prepare the mop pads.
+    - if:
+        - condition: template
+          value_template: "{{ water is defined and water not in [none, ''] }}"
+      then:
+        - alias: Set water output
+          action: select.select_option
+          target:
+            entity_id: select.xiaomi_xx_000000000_ov42gl_mop_water_output_level_p_2_10
+          data:
+            option: "{{ water }}"
+    - delay:
+        seconds: 2
+    # ==========================================================================
+    # ROOM-ID ENCODING -- VERIFIED on the robot 2026-08-08.
+    # MIoT action start-vacuum-room-sweep (siid 2 / aiid 16) takes ONE string
+    # parameter: vacuum-room-ids (piid 15). Comma separated is correct.
+    #   "4"   -> rooms [4]     confirmed
+    #   "4,7" -> rooms [4,7]   confirmed
+    # This single line is what to change if it ever breaks. Alternatives:
+    #   B) JSON array : message: "'{{ rooms | tojson }}'"
+    #   C) JSON object: message: "'{{ {\"rooms\": rooms} | tojson }}'"
+    # Note: get-room-configs is NOT a usable probe - it returns HTTP 200 for
+    # any string, including garbage. Only a real run confirms the format.
+    # ==========================================================================
+    - alias: Start room sweep
+      action: notify.send_message
+      target:
+        entity_id: notify.xiaomi_xx_000000000_ov42gl_start_vacuum_room_sweep_a_2_16
+      data:
+        message: "{{ rooms | join(',') }}"
+
+vacuum_helper_probe_room_id:
+  alias: "[helper] Vacuum - probe room ID format (read-only)"
+  icon: mdi:test-tube
+  mode: single
+  fields:
+    candidate:
+      name: Candidate string
+      required: true
+      example: "3"
+      selector:
+        text:
+  sequence:
+    - action: notify.send_message
+      target:
+        entity_id: notify.xiaomi_xx_000000000_ov42gl_get_room_configs_a_2_11
+      data:
+        message: "{{ candidate }}"
+
+vacuum_living_room:
+  alias: "Aspirar Sala"
+  icon: mdi:robot-vacuum
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [3]
+        clean_type: "Vacuuming"
+        suction: "Standard"
+
+mop_living_room:
+  alias: "Passar Pano na Sala"
+  icon: mdi:bucket-outline
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [3]
+        clean_type: "Mopping"
+        suction: "Standard"
+        water: "Level 2"
+
+vacuum_kitchen:
+  alias: "Aspirar Cozinha"
+  icon: mdi:robot-vacuum
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [4]
+        clean_type: "Vacuuming"
+        suction: "Standard"
+
+mop_kitchen:
+  alias: "Passar Pano na Cozinha"
+  icon: mdi:bucket-outline
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [4]
+        clean_type: "Mopping"
+        suction: "Standard"
+        water: "Level 2"
+
+vacuum_bedroom:
+  alias: "Aspirar Quarto"
+  icon: mdi:robot-vacuum
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [5]
+        clean_type: "Vacuuming"
+        suction: "Standard"
+
+mop_bedroom:
+  alias: "Passar Pano no Quarto"
+  icon: mdi:bucket-outline
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [5]
+        clean_type: "Mopping"
+        suction: "Standard"
+        water: "Level 2"
+
+vacuum_office:
+  alias: "Aspirar Escritório"
+  icon: mdi:robot-vacuum
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [6]
+        clean_type: "Vacuuming"
+        suction: "Standard"
+
+mop_office:
+  alias: "Passar Pano no Escritório"
+  icon: mdi:bucket-outline
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [6]
+        clean_type: "Mopping"
+        suction: "Standard"
+        water: "Level 2"
+
+vacuum_bathroom:
+  alias: "Aspirar Banheiro"
+  icon: mdi:robot-vacuum
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [7]
+        clean_type: "Vacuuming"
+        suction: "Standard"
+
+mop_bathroom:
+  alias: "Passar Pano no Banheiro"
+  icon: mdi:bucket-outline
+  mode: single
+  sequence:
+    - action: script.vacuum_helper_clean_rooms
+      data:
+        rooms: [7]
+        clean_type: "Mopping"
+        suction: "Standard"
+        water: "Level 2"
+
+################################################################################
+# Whole house. These MIoT actions take no parameters, so they are plain button
+# presses. The same reset guard applies: a paused job would otherwise resume.
+################################################################################
+
+vacuum_whole_house:
+  alias: "Aspirar a Casa Toda"
+  icon: mdi:robot-vacuum
+  mode: single
+  sequence:
+    - if:
+        - condition: not
+          conditions:
+            - condition: state
+              entity_id: vacuum.xiaomi_xx_000000000_ov42gl
+              state: "docked"
+      then:
+        - action: button.press
+          target:
+            entity_id: button.xiaomi_xx_000000000_ov42gl_stop_working_a_2_51
+        - delay:
+            seconds: 4
+    - action: select.select_option
+      target:
+        entity_id: select.xiaomi_xx_000000000_ov42gl_sweep_mop_type_p_2_4
+      data:
+        option: "Vacuuming"
+    - action: select.select_option
+      target:
+        entity_id: select.xiaomi_xx_000000000_ov42gl_mode_p_2_9
+      data:
+        option: "Standard"
+    - action: button.press
+      target:
+        entity_id: button.xiaomi_xx_000000000_ov42gl_start_only_sweep_a_2_4
+
+mop_whole_house:
+  alias: "Passar Pano na Casa Toda"
+  icon: mdi:bucket-outline
+  mode: single
+  sequence:
+    - if:
+        - condition: not
+          conditions:
+            - condition: state
+              entity_id: vacuum.xiaomi_xx_000000000_ov42gl
+              state: "docked"
+      then:
+        - action: button.press
+          target:
+            entity_id: button.xiaomi_xx_000000000_ov42gl_stop_working_a_2_51
+        - delay:
+            seconds: 4
+    - action: select.select_option
+      target:
+        entity_id: select.xiaomi_xx_000000000_ov42gl_mop_water_output_level_p_2_10
+      data:
+        option: "Level 2"
+    - action: button.press
+      target:
+        entity_id: button.xiaomi_xx_000000000_ov42gl_start_mop_a_2_5
+
+clean_whole_house:
+  alias: "Limpar a Casa Toda"
+  icon: mdi:home-heart
+  mode: single
+  sequence:
+    - if:
+        - condition: not
+          conditions:
+            - condition: state
+              entity_id: vacuum.xiaomi_xx_000000000_ov42gl
+              state: "docked"
+      then:
+        - action: button.press
+          target:
+            entity_id: button.xiaomi_xx_000000000_ov42gl_stop_working_a_2_51
+        - delay:
+            seconds: 4
+    - action: button.press
+      target:
+        entity_id: button.xiaomi_xx_000000000_ov42gl_start_sweep_mop_a_2_6
+
+robot_go_home:
+  alias: "Robô para a Base"
+  icon: mdi:home-import-outline
+  mode: single
+  sequence:
+    - action: vacuum.return_to_base
+      target:
+        entity_id: vacuum.xiaomi_xx_000000000_ov42gl

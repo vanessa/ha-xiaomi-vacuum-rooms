@@ -1,0 +1,16 @@
+# Local Home Assistant artifacts — never commit these
+secrets.yaml
+*.bak
+*.bak-*
+.storage/
+home-assistant.log*
+home-assistant_v2.db*
+
+# Editor / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Agent tooling
+.claude/
