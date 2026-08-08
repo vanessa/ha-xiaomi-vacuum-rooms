@@ -112,7 +112,9 @@ curl -s -H "Authorization: Bearer $HA_TOKEN" $HA_URL/api/states \
 
 ## Step 4: Remove orphaned entities
 
-`script.reload` does not remove scripts that you erased from the YAML file. The entities stay in the entity registry. They stay exposed to the voice assistant, and they still run their old definitions. A voice command can therefore run a definition that exists in no file. Pre-flight warns about name collisions, and this step removes them.
+`script.reload` does not remove a script that you erased from the YAML file. The entity stays in the entity registry, with the state `unavailable` and the attribute `restored: true`.
+
+An orphan cannot run. A test on 2026-08-08 called a removed script. The call returned HTTP 200, the state stayed `unavailable`, and `last_triggered` never appeared. The result is a dead name in the entity list and in the voice assistant, not a dead action. Do not report an orphan as a cause of unwanted robot movement. Pre-flight warns about name collisions, and this step removes them.
 
 Compare the `script.` entities against the scripts in your YAML file. Remove each entity that the file no longer defines. Use the WebSocket API command `config/entity_registry/remove`. A person can also remove them in Settings > Devices & Services > Entities.
 

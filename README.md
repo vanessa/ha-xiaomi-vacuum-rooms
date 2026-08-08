@@ -52,14 +52,7 @@ Run the pre-flight checks first. Show me the results before you install.
 Ask me before you start the robot.
 ```
 
-[`AGENTS.md`](AGENTS.md) tells the agent to do these steps:
-
-1. Download `scripts.yaml` and `preflight.py` from their raw URLs.
-2. Read your entity prefix and your room IDs from the live system.
-3. Replace both values in `scripts.yaml`.
-4. Install the file and reload the scripts.
-5. Remove orphaned entities from an earlier install.
-6. Expose the correct scripts to your voice assistant.
+[`AGENTS.md`](AGENTS.md) holds the full procedure.
 
 Two facts about agents and this package:
 
@@ -166,7 +159,11 @@ The accepted configuration is also short-lived. A read a few seconds after dispa
 
 ### The orphan trap
 
-`script.reload` does not remove scripts that you erased from the YAML file. The entities stay in the entity registry. They stay exposed to your voice assistant, and they still run their old definitions. A voice command can therefore run a definition that exists in no file.
+`script.reload` does not remove a script that you erased from the YAML file. The entity stays in the entity registry. Home Assistant keeps it in the entity list with the state `unavailable` and the attribute `restored: true`.
+
+An orphan cannot run. Its definition is gone from memory. A test on 2026-08-08 added a script, reloaded, erased it from the YAML file, and reloaded again. The entity remained. A call to it returned HTTP 200, the state stayed `unavailable`, and `last_triggered` never appeared.
+
+The result is a dead name, not a dead action. Your voice assistant can still list the old scene, and the command then does nothing. An orphan cannot clean the wrong room, and it cannot start the robot.
 
 After you rename a script, compare the entities against your YAML file. Remove each entity that the file no longer defines. Open Settings > Devices & Services > Entities and filter by `script.`.
 
@@ -197,7 +194,7 @@ This table gives the true test status of each behavior:
 | Single-room vacuum through `start-vacuum-room-sweep` | Tested on hardware |
 | `clean_mode` is `sweep_type`, not `sweep_mop_type` | Tested on hardware |
 | A paused job causes a whole-house clean | Tested. Reproduced from the logs |
-| Orphaned scripts survive `script.reload` | Tested. 19 orphans found |
+| An erased script survives `script.reload` as an `unavailable` entity | Tested on hardware. The orphan cannot run |
 | The 4-second reset guard stops the whole-house fallback | Tested on hardware |
 | Multi-room selection (`"4,7"`) | Not tested. An earlier result was a short-lived state, read before it reverted |
 
