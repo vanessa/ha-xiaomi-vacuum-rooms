@@ -164,4 +164,6 @@ Then map these six items: `start-vacuum-room-sweep`, `stop-working`, `sweep-mop-
 
 ## Your report to the user
 
-Name the behaviors that you tested on hardware. Name the behaviors that you did not test. Two results are usually still open: multi-room selection (`"4,7"`), and the 4-second reset guard. A test of the guard must reproduce a paused job first. State this, and do not imply a wider test than you did.
+Name the behaviors that you tested on hardware. Name the behaviors that you did not test. One result is usually still open: multi-room selection (`"4,7"`). State this, and do not imply a wider test than you did.
+
+The 4-second reset guard is tested. A paused job no longer causes a whole-house clean.

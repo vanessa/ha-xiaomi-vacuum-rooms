@@ -160,7 +160,7 @@ If an earlier job is still paused, the robot discards your room selection. It th
 18:20:02  CFG {"clean_mode":1}                2s later: whole-house instead
 ```
 
-The room command was correct both times. Each script in this package therefore presses `stop_working` and waits 4 seconds when the robot is not `docked`.
+The room command was correct both times. Each script in this package therefore presses `stop_working` and waits 4 seconds when the robot is not `docked`. This guard is tested on hardware. A paused job no longer causes a whole-house clean.
 
 The accepted configuration is also short-lived. A read a few seconds after dispatch can show a room selection that the robot discards next. Judge the result by the rooms that the robot cleans.
 
@@ -198,8 +198,8 @@ This table gives the true test status of each behavior:
 | `clean_mode` is `sweep_type`, not `sweep_mop_type` | Tested on hardware |
 | A paused job causes a whole-house clean | Tested. Reproduced from the logs |
 | Orphaned scripts survive `script.reload` | Tested. 19 orphans found |
+| The 4-second reset guard stops the whole-house fallback | Tested on hardware |
 | Multi-room selection (`"4,7"`) | Not tested. An earlier result was a short-lived state, read before it reverted |
-| The 4-second reset guard stops the whole-house fallback | Not tested. A test must reproduce a paused job first |
 
 ## License
 
