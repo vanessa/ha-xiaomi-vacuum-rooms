@@ -1,66 +1,104 @@
 # ha-xiaomi-vacuum-rooms
 
-Room-addressable cleaning for Xiaomi MIoT robot vacuums in Home Assistant, exposed to Alexa as scenes.
+Room-by-room cleaning for Xiaomi MIoT robot vacuums in Home Assistant. Your voice assistant shows each script as a scene.
 
-Drop-in `scripts.yaml` for Xiaomi vacuums running under the [`xiaomi_home`](https://github.com/XiaomiHome/ha_xiaomi_home) integration: clean one named room, mop one named room, or run the whole house, by voice.
+Clean one room, mop one room, or clean the whole house, by voice.
 
-Developed against a **Xiaomi H50 Pro** (`xiaomi.vacuum.ov42gl`). Should work on any MIoT vacuum whose spec exposes the `start-vacuum-room-sweep` action — see [Porting to another model](#porting-to-another-model).
+Tested on a **Xiaomi H50 Pro** (`xiaomi.vacuum.ov42gl`). The scripts work on any MIoT vacuum that has the `start-vacuum-room-sweep` action. See [If entities are missing](#if-entities-are-missing).
 
 ## Why this exists
 
-`xiaomi_home`'s `vacuum.*` entity implements only `START`, `STOP`, `PAUSE`, `RETURN_HOME`, `LOCATE` and `FAN_SPEED`. **There is no `send_command`.** Every room-cleaning recipe written for `xiaomi_miio` or Roborock is therefore inapplicable — `vacuum.send_command` simply does not exist on these entities.
+The `vacuum.*` entity from `xiaomi_home` supports six commands: `START`, `STOP`, `PAUSE`, `RETURN_HOME`, `LOCATE`, and `FAN_SPEED`. It has no `send_command`. Room recipes written for `xiaomi_miio` or Roborock therefore cannot work with this integration.
 
-`xiaomi_home` instead surfaces each MIoT *action* as a **`notify` entity**. Room cleaning goes through `notify.send_message`, which is not obvious and not documented anywhere prominent.
+`xiaomi_home` shows each MIoT action as a `notify` entity instead. Room cleaning goes through `notify.send_message` on that entity. No obvious documentation says this.
 
 ## Requirements
 
-- Home Assistant ≥ 2024.6 (needs `NotifyEntity`)
-- `xiaomi_home` installed via HACS and configured with your Xiaomi account
-- A **saved map with named rooms** in the Xiaomi Home app — rooms must exist before HA can address them
-- For voice: Nabu Casa Cloud, or a self-hosted Alexa skill
+- Home Assistant 2024.6 or later. Earlier versions have no `NotifyEntity`.
+- `xiaomi_home` from HACS, configured with your Xiaomi account.
+- A saved map with named rooms in the Xiaomi Home app. Home Assistant cannot create this map.
+- For voice control: Nabu Casa Cloud, or your own Alexa skill.
 
 ## Install
 
-1. Copy the contents of `scripts.yaml` into your `scripts.yaml` (or a package under `packages/`, nested beneath a `script:` key).
-2. Substitute your entity prefix — see [Finding your entity prefix](#finding-your-entity-prefix).
-3. Substitute your room IDs — see [Finding your room IDs](#finding-your-room-ids).
-4. Developer Tools → YAML → **Reload scripts**. See [the orphan trap](#the-orphan-trap) first.
-5. Expose the `vacuum_*` / `mop_*` / `clean_*` scripts to your voice assistant. **Do not expose the two `vacuum_helper_*` scripts.**
+You do not need to clone this repository. Download the raw files, or give the whole task to an agent. See [Install with an agent](#install-with-an-agent).
 
-The script aliases in this repo are **Portuguese**, because that is the language spoken to Alexa in the original setup. Entity IDs, fields and comments are English. Translate the `alias:` values to whatever you speak — that string is what the assistant listens for, and nothing else depends on it.
+1. Run the [pre-flight checks](#pre-flight). The checks are read-only.
+2. Copy [`scripts.yaml`](https://raw.githubusercontent.com/vanessa/ha-xiaomi-vacuum-rooms/main/scripts.yaml) into your `scripts.yaml` file. You can also install it as a package under a `script:` key.
+3. Replace the entity prefix. See [Find your entity prefix](#find-your-entity-prefix).
+4. Replace the room IDs. See [Find your room IDs](#find-your-room-ids).
+5. Read [The orphan trap](#the-orphan-trap). Then open Developer Tools > YAML and reload the scripts.
+6. Expose the `vacuum_*`, `mop_*`, and `clean_*` scripts to your voice assistant.
+7. Do not expose the two `vacuum_helper_*` scripts. They take parameters, and a scene cannot supply them.
 
-## Installing with an agent
+The aliases in `scripts.yaml` are Portuguese, because that is the language of the original household. Translate each `alias:` into your language. The alias is the phrase that the assistant listens for, and nothing else depends on it. Entity IDs, field names, and comments are English.
 
-Both substitutions above have to be read off your own system, which makes this
-a good fit for an AI coding agent that has access to your Home Assistant
-container — a shell inside it, a long-lived access token, or both.
+## Install with an agent
 
-[`AGENTS.md`](AGENTS.md) is written for exactly that: point the agent at it and
-it will discover your entity prefix and room IDs, substitute them, install and
-reload the scripts, clean up orphaned entities from any previous install, and
-expose the right scripts to your voice assistant.
+You must read both substitution values from your own system. An agent with access to your Home Assistant container can do this for you. The agent needs a shell inside the container, a long-lived access token, or both.
+
+The agent does not need a clone. It downloads each file from a URL.
+
+Give the agent this text:
 
 ```
-Read AGENTS.md in this repo and install this package on my Home Assistant.
-You have <shell access to the HA container / a long-lived token at ...>.
-Ask me before starting the robot.
+Install this on my Home Assistant. Follow the guide at
+https://raw.githubusercontent.com/vanessa/ha-xiaomi-vacuum-rooms/main/AGENTS.md
+
+Home Assistant is at http://<your-ha-host>:8123
+Token: <your long-lived access token>
+
+Run the pre-flight checks first. Show me the results before you install.
+Ask me before you start the robot.
 ```
 
-Two things worth knowing before you hand this to an agent:
+[`AGENTS.md`](AGENTS.md) tells the agent to do these steps:
 
-- **Insist on consent before dispatch.** Every script moves a real machine
-  around your home. `AGENTS.md` instructs the agent not to start the robot
-  without asking; keep that instruction in your prompt too.
-- **Distrust a quick "verified".** This system has a specific trap where the
-  accepted cleaning config reverts about two seconds after dispatch, so an
-  agent polling once at +5 s will report success on a run that is about to
-  become a whole-house clean. `AGENTS.md` documents the correct check, but it
-  is worth asking the agent which claims it confirmed on hardware and which it
-  inferred.
+1. Download `scripts.yaml` and `preflight.py` from their raw URLs.
+2. Read your entity prefix and your room IDs from the live system.
+3. Replace both values in `scripts.yaml`.
+4. Install the file and reload the scripts.
+5. Remove orphaned entities from an earlier install.
+6. Expose the correct scripts to your voice assistant.
 
-## Finding your entity prefix
+Two facts about agents and this package:
 
-Entity IDs from `xiaomi_home` encode your account region and device id:
+- Every script moves a real machine through your home. `AGENTS.md` tells the agent to ask you before it starts the robot. Put the same instruction in your own prompt.
+- A fast report of success is often wrong here. The accepted cleaning configuration reverts about 2 seconds after dispatch. An agent that reads the state once at 5 seconds reports success for a job that becomes a whole-house clean. `AGENTS.md` gives the correct test. Ask the agent which results it tested on hardware.
+
+## Pre-flight
+
+Run these checks before you install, with an agent or without one. The checks are read-only. They find the faults that otherwise appear later as a scene that does nothing.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vanessa/ha-xiaomi-vacuum-rooms/main/preflight.py -o preflight.py
+export HA_URL=http://<your-ha-host>:8123
+export HA_TOKEN=<your long-lived access token>
+python3 preflight.py
+```
+
+The script makes sure that:
+
+| Check | Why it is necessary |
+|---|---|
+| The API answers and the token works | The install fails at the start, not in the middle |
+| Home Assistant is 2024.6 or later | Earlier versions have no `NotifyEntity`, and room cleaning is impossible |
+| The entity prefix resolves | Every other entity ID comes from this prefix |
+| All 10 required entities exist | A missing entity means a different MIoT spec. See [If entities are missing](#if-entities-are-missing) |
+| The select options match | The most common silent fault. Read the paragraph below |
+| The room list is not empty | No saved map means no rooms to address |
+| The robot is docked | A warning. A paused job makes the robot clean the whole house |
+| No script names collide | A warning. It shows leftovers from an earlier install |
+
+The option test is the important one. The scripts send exact strings such as `"Vacuuming"`, `"Standard"`, and `"Level 2"`. These strings come from the translations in the MIoT spec. They differ between models and between versions of the integration. If a string does not match, `select.select_option` fails when the script runs, not when you install it.
+
+The script prints your prefix and your room IDs when all checks pass. These are the two values that the next two sections need.
+
+If a check fails, do not install. Correct the fault first.
+
+## Find your entity prefix
+
+Entity IDs from `xiaomi_home` contain your account region and your device ID:
 
 ```
 vacuum.xiaomi_cn_123456789_ov42gl
@@ -68,38 +106,38 @@ vacuum.xiaomi_cn_123456789_ov42gl
        vendor region device model
 ```
 
-This repo ships the placeholder `xiaomi_xx_000000000_ov42gl`. Find yours under Developer Tools → States, then:
+`scripts.yaml` contains the placeholder `xiaomi_xx_000000000_ov42gl`. Pre-flight prints your real prefix. You can also read it in Developer Tools > States. Then run:
 
 ```bash
 sed -i 's/xiaomi_xx_000000000_ov42gl/xiaomi_cn_123456789_ov42gl/g' scripts.yaml
 ```
 
-## Finding your room IDs
+## Find your room IDs
 
-Developer Tools → States → `sensor.<your_prefix>_room_information_p_2_16`:
+Pre-flight prints the room IDs. To read them yourself, open Developer Tools > States and find `sensor.<your_prefix>_room_information_p_2_16`:
 
 ```json
 {"rooms": [{"id": 3, "name": "Living room"}, {"id": 4, "name": "Kitchen"}], "map_uid": 1}
 ```
 
-IDs are per-map. Re-mapping your home can renumber them.
+Each map has its own IDs. A new map of your home can change the numbers.
 
-## The parts that are easy to get wrong
+## Common mistakes
 
 ### The two enums
 
-These are distinct properties, and confusing them is the single most common failure:
+These are two different properties. Most faults start here:
 
 ```
 sweep_mop_type (piid 2.4)   1 Vacuuming · 2 Mopping · 3 Vacuuming & Mopping · 4 Vacuuming before mopping
 sweep_type     (piid 2.5)   1 Whole-house · 2 Zone · 3 Area · 4 Edge · ...
 ```
 
-**`clean_mode` in `current_cleaning_config` is `sweep_type`, not `sweep_mop_type`.** So `{"rooms":[4],"clean_mode":3}` means *"an Area job covering room 4"* — it says nothing about whether the robot vacuums or mops. Reading it as "mode 3 = vacuum and mop" will send you chasing a bug that isn't there.
+`clean_mode` in `current_cleaning_config` is `sweep_type`. It is not `sweep_mop_type`. Therefore `{"rooms":[4],"clean_mode":3}` means "an Area job on room 4". It says nothing about vacuum or mop. If you read it as "mode 3 is vacuum and mop", you look for a fault that does not exist.
 
 ### Room ID encoding
 
-`start-vacuum-room-sweep` (siid 2 / aiid 16) takes **one** string parameter, `vacuum-room-ids` (piid 15), as comma-separated IDs:
+The `start-vacuum-room-sweep` action (siid 2, aiid 16) takes one string parameter. The parameter is `vacuum-room-ids` (piid 15). Write the IDs with commas between them:
 
 ```yaml
 - action: notify.send_message
@@ -109,60 +147,60 @@ sweep_type     (piid 2.5)   1 Whole-house · 2 Zone · 3 Area · 4 Edge · ...
     message: "{{ rooms | join(',') }}"     # -> "4,7"
 ```
 
-A bare `[3,4]` in `message` does not work: `notify.send_message` YAML-parses the field first, so it arrives as a list and fails validation against the single-parameter spec. JSON forms need inner quoting — `message: "'{{ rooms | tojson }}'"`.
+A plain `[3,4]` in `message` fails. `notify.send_message` parses the field as YAML first, so the value arrives as a list. The spec accepts one parameter, and a list fails validation. JSON forms need inner quotes: `message: "'{{ rooms | tojson }}'"`.
 
-**`get-room-configs` is not a usable probe.** It returns HTTP 200 for any string, including garbage. Only a real run confirms the format.
+The `get-room-configs` action is not a test for the format. It returns HTTP 200 for any string, and garbage strings included. Only a real clean shows the correct format.
 
 ### The paused-job trap
 
-**If a previous job is still paused, the robot discards the room selection and starts a whole-house clean instead.** Observed directly:
+If an earlier job is still paused, the robot discards your room selection. It then cleans the whole house. These log lines show it:
 
 ```
-18:17:29  CFG {"rooms":[5],"clean_mode":3}   bedroom job accepted
-18:17:42  STATE paused                        job left paused
-18:20:00  CFG {"rooms":[7],"clean_mode":3}   bathroom job accepted
-18:20:02  CFG {"clean_mode":1}                2s later: reverted to whole-house
+18:20:00  CFG {"rooms":[7],"clean_mode":3}   accepted
+18:20:02  CFG {"clean_mode":1}                2s later: whole-house instead
 ```
 
-The room command was correct both times. Every script here therefore presses `stop_working` and waits 4 s when the robot is not `docked`, before issuing the command.
+The room command was correct both times. Each script in this package therefore presses `stop_working` and waits 4 seconds when the robot is not `docked`.
 
-A corollary for anyone debugging this: **the accepted config is transient.** Reading `current_cleaning_config` a few seconds after dispatch can show a room selection that is about to be discarded. Confirm against what the robot actually cleans, not against a state read.
+The accepted configuration is also short-lived. A read a few seconds after dispatch can show a room selection that the robot discards next. Judge the result by the rooms that the robot cleans.
 
 ### The orphan trap
 
-**`script.reload` does not delete scripts you removed from YAML.** They survive in the entity registry, stay exposed to your voice assistant, and keep firing — so a renamed scene can silently keep running its old definition. Renaming scripts leaves orphans behind that must be removed from the entity registry by hand (Settings → Devices & Services → Entities, filter by `script.`).
+`script.reload` does not remove scripts that you erased from the YAML file. The entities stay in the entity registry. They stay exposed to your voice assistant, and they still run their old definitions. A voice command can therefore run a definition that exists in no file.
+
+After you rename a script, compare the entities against your YAML file. Remove each entity that the file no longer defines. Open Settings > Devices & Services > Entities and filter by `script.`.
 
 ## Alexa
 
-Home Assistant maps a `script` entity to Alexa's `SceneController`, so the phrasing is *"Alexa, turn on \<alias\>"* — not "Alexa, ask ... to ...". With Portuguese aliases:
+Home Assistant maps a `script` entity to the Alexa `SceneController`. The phrase is therefore "turn on \<alias\>". With the Portuguese aliases in this package:
 
 > "Alexa, ligar Aspirar Cozinha"
 
-Keep the `vacuum_helper_*` scripts unexposed; they take parameters and are meaningless as scenes.
+Keep the two `vacuum_helper_*` scripts unexposed.
 
-## Porting to another model
+## If entities are missing
 
-`scripts.yaml` hardcodes entity IDs whose suffixes are MIoT `siid`/`piid`/`aiid` coordinates (`_a_2_16`, `_p_2_4`). These are **spec-specific and will differ on other models.** To port, pull your model's spec:
+The entity suffixes `_a_2_16` and `_p_2_4` are MIoT `siid`, `piid`, and `aiid` coordinates. Each vacuum model has its own numbers. Download the spec for your model:
 
 ```
-https://miot-spec.org/miot-spec-v2/instance?type=<your urn>
+https://miot-spec.org/miot-spec-v2/instance?type=<urn of the model>
 ```
 
-and map: `start-vacuum-room-sweep`, `stop-working`, `sweep-mop-type`, `mode`, `mop-water-output-level`, `room-information`.
+Then map these six items: `start-vacuum-room-sweep`, `stop-working`, `sweep-mop-type`, `mode`, `mop-water-output-level`, and `room-information`. Update `scripts.yaml` and the `REQUIRED` table in `preflight.py`.
 
-## Verification status
+## Test status
 
-Honest accounting of what has and has not been proven on real hardware:
+This table gives the true test status of each behavior:
 
-| Behaviour | Status |
+| Behavior | Status |
 |---|---|
-| Single-room vacuum via `start-vacuum-room-sweep` | **Confirmed** on hardware |
-| `clean_mode` is `sweep_type`, not `sweep_mop_type` | **Confirmed** |
-| Paused job causes whole-house fallback | **Confirmed** — reproduced from logs |
-| Orphaned scripts survive `script.reload` | **Confirmed** — 19 orphans found |
-| Multi-room (`"4,7"`) | **Unverified.** An earlier "confirmed" reading turned out to be a transient state caught before it flipped. |
-| The 4 s reset guard actually prevents the fallback | **Unverified.** It targets the exact observed failure, but proving it requires deliberately reproducing a paused job. |
+| Single-room vacuum through `start-vacuum-room-sweep` | Tested on hardware |
+| `clean_mode` is `sweep_type`, not `sweep_mop_type` | Tested on hardware |
+| A paused job causes a whole-house clean | Tested. Reproduced from the logs |
+| Orphaned scripts survive `script.reload` | Tested. 19 orphans found |
+| Multi-room selection (`"4,7"`) | Not tested. An earlier result was a short-lived state, read before it reverted |
+| The 4-second reset guard stops the whole-house fallback | Not tested. A test must reproduce a paused job first |
 
 ## License
 
-MIT — see `LICENSE`.
+MIT. See `LICENSE`.
