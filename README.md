@@ -142,6 +142,8 @@ The `start-vacuum-room-sweep` action (siid 2, aiid 16) takes one string paramete
 
 A plain `[3,4]` in `message` fails. `notify.send_message` parses the field as YAML first, so the value arrives as a list. The spec accepts one parameter, and a list fails validation. JSON forms need inner quotes: `message: "'{{ rooms | tojson }}'"`.
 
+A test on 2026-08-08 sent `"4,7"` for the kitchen and the bathroom. The selection held for the whole job of 10 minutes, and the robot then docked. The cleaning record of the device reports `room_num: 2` and an area of 622. A whole-house clean on the same map reports an area of 4020. Two rooms therefore ran, and the robot did not fall back to the whole house.
+
 The `get-room-configs` action is not a test for the format. It returns HTTP 200 for any string, and garbage strings included. Only a real clean shows the correct format.
 
 ### The paused-job trap
@@ -196,7 +198,7 @@ This table gives the true test status of each behavior:
 | A paused job causes a whole-house clean | Tested. Reproduced from the logs |
 | An erased script survives `script.reload` as an `unavailable` entity | Tested on hardware. The orphan cannot run |
 | The 4-second reset guard stops the whole-house fallback | Tested on hardware |
-| Multi-room selection (`"4,7"`) | Not tested. An earlier result was a short-lived state, read before it reverted |
+| Multi-room selection (`"4,7"`) | Tested on hardware. The device record shows `room_num: 2` |
 
 ## License
 

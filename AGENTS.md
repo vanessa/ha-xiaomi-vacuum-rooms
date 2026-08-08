@@ -166,6 +166,6 @@ Then map these six items: `start-vacuum-room-sweep`, `stop-working`, `sweep-mop-
 
 ## Your report to the user
 
-Name the behaviors that you tested on hardware. Name the behaviors that you did not test. One result is usually still open: multi-room selection (`"4,7"`). State this, and do not imply a wider test than you did.
+Name the behaviors that you tested on hardware. Name the behaviors that you did not test. Do not imply a wider test than you did.
 
-The 4-second reset guard is tested. A paused job no longer causes a whole-house clean.
+Every behavior of this package is now tested on the reference vacuum. The 4-second reset guard works, and a paused job no longer causes a whole-house clean. Multi-room selection works, and the cleaning record of the device reports `room_num: 2` for a two-room job. Your own install still needs its own test, because the entity IDs and the room IDs differ.
